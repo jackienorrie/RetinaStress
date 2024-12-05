@@ -1,0 +1,367 @@
+---
+title: "Human Stress R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(Seurat)
+library(cowplot)
+library(ggplot2)
+library(dplyr)
+library(Matrix)
+library(shiny)
+library(scater)
+library(tidyverse)
+library(edgeR)
+library(magrittr)
+library(purrr)
+library(reshape2)
+library(S4Vectors)
+library(pheatmap)
+library(apeglm)
+library(png)
+library(DESeq2)
+library(RColorBrewer)
+library(dendextend)
+```
+
+```{r}
+T55.data <- Read10X(data.dir = "DYE2045/outs/filtered_feature_bc_matrix")
+T55 <- CreateSeuratObject(counts = T55.data)
+T55$Group = "WT"
+T55$orig.ident = "T55"
+
+T13.data <- Read10X(data.dir = "DYE2046/outs/filtered_feature_bc_matrix")
+T13 <- CreateSeuratObject(counts = T13.data)
+T13$Group = "WT"
+T13$orig.ident = "T13"
+
+T34.data <- Read10X(data.dir = "DYE2227/outs/filtered_feature_bc_matrix")
+T34 <- CreateSeuratObject(counts = T34.data)
+T34$Group = "WT"
+T34$orig.ident = "T34"
+
+CTR_34.data <- Read10X(data.dir = "DYE2228/outs/filtered_feature_bc_matrix")
+CTR_34 <- CreateSeuratObject(counts = CTR_34.data)
+CTR_34$Group = "CTR"
+CTR_34$orig.ident = "CTR_34"
+
+G1_34.data <- Read10X(data.dir = "DYE2229/outs/filtered_feature_bc_matrix")
+G1_34 <- CreateSeuratObject(counts = G1_34.data)
+G1_34$Group = "Stress"
+G1_34$orig.ident = "G1_34"
+
+T59.data <- Read10X(data.dir = "DYE2230/outs/filtered_feature_bc_matrix")
+T59 <- CreateSeuratObject(counts = T59.data)
+T59$Group = "WT"
+T59$orig.ident = "T59"
+
+Glut.data <- Read10X(data.dir = "DYE2231/outs/filtered_feature_bc_matrix")
+Glut <- CreateSeuratObject(counts = Glut.data)
+Glut$Group = "Stress"
+Glut$orig.ident = "Glut"
+
+Ouab.data <- Read10X(data.dir = "DYE2232/outs/filtered_feature_bc_matrix")
+Ouab <- CreateSeuratObject(counts = Ouab.data)
+Ouab$Group = "Stress"
+Ouab$orig.ident = "Ouab"
+
+IFN.data <- Read10X(data.dir = "DYE2233/outs/filtered_feature_bc_matrix")
+IFN <- CreateSeuratObject(counts = IFN.data)
+IFN$Group = "Stress"
+IFN$orig.ident = "IFN"
+
+Gluc.data <- Read10X(data.dir = "DYE2234/outs/filtered_feature_bc_matrix")
+Gluc <- CreateSeuratObject(counts = Gluc.data)
+Gluc$Group = "Stress"
+Gluc$orig.ident = "Gluc"
+
+C40.data <- Read10X(data.dir = "DYE2237/outs/filtered_feature_bc_matrix")
+C40 <- CreateSeuratObject(counts = C40.data)
+C40$Group = "Stress"
+C40$orig.ident = "C40"
+
+KCl.data <- Read10X(data.dir = "DYE2238/outs/filtered_feature_bc_matrix")
+KCl <- CreateSeuratObject(counts = KCl.data)
+KCl$Group = "Stress"
+KCl$orig.ident = "KCl"
+
+p715.data <- Read10X(data.dir = "DYE2239/outs/filtered_feature_bc_matrix")
+p715 <- CreateSeuratObject(counts = p715.data)
+p715$Group = "Stress"
+p715$orig.ident = "p715"
+
+O23.data <- Read10X(data.dir = "DYE2240/outs/filtered_feature_bc_matrix")
+O23 <- CreateSeuratObject(counts = O23.data)
+O23$Group = "Stress"
+O23$orig.ident = "O23"
+
+C33.data <- Read10X(data.dir = "DYE2241/outs/filtered_feature_bc_matrix")
+C33 <- CreateSeuratObject(counts = C33.data)
+C33$Group = "Stress"
+C33$orig.ident = "C33"
+
+LPS.data <- Read10X(data.dir = "DYE2244/outs/filtered_feature_bc_matrix")
+LPS <- CreateSeuratObject(counts = LPS.data)
+LPS$Group = "Stress"
+LPS$orig.ident = "LPS"
+
+CTR.data <- Read10X(data.dir = "DYE2246/outs/filtered_feature_bc_matrix")
+CTR <- CreateSeuratObject(counts = CTR.data)
+CTR$Group = "CTR"
+CTR$orig.ident = "CTR"
+
+T64.data <- Read10X(data.dir = "DYE2247/outs/filtered_feature_bc_matrix")
+T64 <- CreateSeuratObject(counts = T64.data)
+T64$Group = "WT"
+T64$orig.ident = "T64"
+
+
+object.list <- list( T55, T13, T34, T64, CTR, CTR_34, T59, Gluc, Glut, IFN, KCl, LPS, O23, C33, Ouab, p715, C40)
+
+names(object.list) <- c("T55", "T13", "T34", "T64", "CTR", "CTR_34", "T59", "Gluc", "Glut", "IFN", "KCl", "LPS", "O23", "C33", "Ouab", "p715", "C40")
+
+object.list <- lapply(X = object.list, FUN = function(x) {
+  x[["percent.mt"]] <- PercentageFeatureSet(x, pattern = "^MT-")
+  x <- subset(x, subset = nFeature_RNA > 300 & percent.mt <15)
+  x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 5000)
+})
+
+features <- SelectIntegrationFeatures(object.list, nfeatures = 5000)
+object.list <- lapply(X = object.list, FUN = function(x) {
+    x <- ScaleData(x, features = features, verbose = FALSE)
+    x <- RunPCA(x, features = features, verbose = FALSE)
+})
+
+stress.anchors <- FindIntegrationAnchors(object.list, anchor.features = features, reduction = "rpca", reference = c(1, 2, 3, 4, 7))
+
+
+stress.integrated <- IntegrateData(anchorset = stress.anchors)
+
+DefaultAssay(stress.integrated) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+stress.integrated <- ScaleData(stress.integrated, verbose = FALSE)
+stress.integrated <- RunPCA(stress.integrated, npcs = 30, verbose = FALSE)
+stress.integrated <- RunUMAP(stress.integrated, reduction = "pca", dims = 1:30)
+stress.integrated <- FindNeighbors(stress.integrated, reduction = "pca", dims = 1:30)
+stress.integrated <- FindClusters(stress.integrated, resolution = 5)
+
+#Cell Type Identification
+#pdf(file = paste(full_path, "Experiment#", Experiment.Number, "/", Integration.Method, "_Integration/4_", Integration.Method, "_cell_signature_top50DE_plots.pdf", sep = ""), width = 60, height = 6)
+    #Rod cells:
+    Rod.Genes <- c('RHO', 'RP1', 'CNGA1', 'NRL', 'PDE6B', 'NR2E3', 'GUCA1B', 'SLC24A1', 'PDE6A', 'SAMD11', 'REEP6', 'RS1', 'RDH12', 'AI847159', 'PEX5L', 'NXNL1', 'SGK1', 'VTN', 'AIPL1', 'CASZ1', 'GRK1', 'HMGB2', 'FAM161A', 'GM48551', 'PDZPH1', 'HK2', 'NXNL2', '1-MAR', 'PROM1', 'RABGEF1', 'FAIM', 'FSCN2', 'SUSD3', 'KCNJ14', 'WDR17', 'DRD4', 'CCDC126', 'CABP4', 'LBHD1', 'GRTP1', 'ABCA4', 'SLC4A7', 'MAK', 'MPP4', 'RGS9', 'PLA2G7', 'D1ERTD622E', 'PLA2R1', 'TNFSF12', 'PLEKHF2', 'GLMN')
+    Rod.Genes <- Rod.Genes[Rod.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Rod.Genes), name = 'rod_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "rod_score1", label = TRUE)  + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "rod_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "rod_score1", pt.size = 0) + theme(aspect.ratio = 1))
+ 
+    #Bipolar cells:
+    Bipolar.Genes = c('GNG13', 'PCP2', 'TRNP1', 'TRPM1', 'SCGN', 'GM4792', 'GSG1', 'LRTM1', 'CABP5', 'ISL1', 'CACNA2D3', 'SCG2', 'NEUROD4', 'KCNMA1', 'B3GALT2', 'BC030499', 'GRM6', 'NTNG1', 'CADPS', 'NDNF', 'VSX2', 'QPCT', 'PCP4', 'NRN1L', 'C130073E24RIK', 'PTPRD', 'PTPRZ1', 'SEBOX', 'GABRA1', 'CAR10', 'GABRR2', 'PROX1', 'SAMSN1', 'LHX4', 'FAM135B', 'GABRR1', 'CAR8', 'FRMD3', 'CELF3', 'GPR179', 'ASAP2', 'TMEM215', 'GRIK1', 'GNB3', 'SLIT2', 'THSD7A', 'ZFHX4', 'AUTS2', 'TNNT1', 'CNTN4')
+    Bipolar.Genes <- Bipolar.Genes[Bipolar.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Bipolar.Genes), name = 'bipolar_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "bipolar_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "bipolar_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "bipolar_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+    #Cone cells:
+  Cone.Genes = c('OPN1SW', 'PDE6H', 'ARR3', 'OPN1MW', 'GNGT2', 'GNAT2', 'PDE6C', 'KCNE2', 'CNGB3', 'MYLK', 'CCDC136', 'HOPX', 'OSGEP', 'GZMM', 'PCDH15', 'OLFM1', 'NDUFAF5', 'ADRB1', 'PGC', 'ACBD6', 'EIF3B', 'CD59A', 'PPM1J', 'SCG3', 'QSOX1', 'FZD10', 'PYGM', 'CKMT1', 'THRB', 'HSPB6', 'NRCAM', 'MGST3', 'TSHZ2', 'SLC24A2', 'FAM19A3', 'GULO', 'MPP6', 'DIXDC1', 'MFGE8', 'SPTSSA', 'CASP7', 'GSDME', 'AGR2', 'SLC8A3', 'ELOVL2', 'GM42697', 'JCHAIN', 'ANKRD33', 'JAM3', 'CAMK2B')
+    Cone.Genes <- Cone.Genes[Cone.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Cone.Genes), name = 'cone_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "cone_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "cone_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "cone_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+    #Muller glia cells:
+    Muller.Glia.Genes = c('APOE', 'GLUL', 'CLU', 'RLBP1', 'PTGDS', 'SPC25', 'FXYD1', 'SLC1A3', 'CP', 'SPARC', 'CD9', 'PRDX6', 'CAR14', 'DKK3', 'HES1', 'DAPL1', 'PTN', 'ABCA8A', 'CRYAB', 'TRF', 'ESPN', 'FOS', 'GNAI2', 'TIMP3', 'KDR', 'COX4I2', 'GPR37', 'AQP4', 'PDPN', 'VIM', 'SOX9', 'PLPP3', 'CRYM', 'ZFP36L1', 'JUN', 'GNG5', 'RBP1', 'TSC22D4', 'PMEPA1', 'ID3', 'MLC1', 'SPON1', 'FXYD6', 'SLMAP', 'NDRG2', 'HOPX', 'GPM6B', 'S100A16', 'SLITRK2', 'S100A1')
+    Muller.Glia.Genes <- Muller.Glia.Genes[Muller.Glia.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Muller.Glia.Genes), name = 'mullerglia_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "mullerglia_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "mullerglia_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "mullerglia_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+    #Amacrine cells:
+    Amacrine.Genes = c('SNHG11', 'CARTPT', 'PAX6', 'ATP1B1', 'BASP1', 'TFAP2B', 'C1QL1', 'SLC6A9', 'SLC32A1', 'NHLH2', 'ELAVL3', 'SLC6A1', 'RPH3A', 'TKT', 'GAD1', 'EBF1', 'NRXN2', 'LY6H', 'SYNPR', 'CALB2', 'NRXN1', 'TAC1', 'NRSN1', 'LAMP5', 'CXCL14', 'HPCA', 'LSAMP', 'NDRG4', 'DLGAP1', 'TMX4', 'SIX3', 'LDHB', 'LHFP', 'CRABP1', 'STMN1', 'MARCKS', 'PTPRF', 'INSIG1', 'CPLX2', 'TAGLN3', 'DYNC1I1', 'CDK14', 'NECAB1', 'RESP18', 'GPM6A', 'CHD3OS', 'CABP1', 'PNMAL2', 'GRIA3', 'C1QL2')
+    Amacrine.Genes <- Amacrine.Genes[Amacrine.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Amacrine.Genes), name = 'amacrine_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "amacrine_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "amacrine_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "amacrine_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+    #Retinal ganglion cells (RGC):
+    Retinal.Ganglion.Genes = c('CALB2', 'SNCG', 'NEFL', 'NRN1', 'STMN2', 'UCHL1', 'THY1', 'RBPMS', 'POU4F1', 'FXYD7', 'RBPMS2', 'TUSC5', 'NRGN', 'EBF1', 'SLC17A6', 'S100A10', 'ATP1B1', 'TPPP3', 'NEFM', 'OLFM1', 'GAP43', 'CDK14', 'TMEM163', 'PCDH10', 'SCN1A', 'NELL2', 'CLEC2L', 'MT3', 'EPHA5', 'SCN2A', 'INA', 'TUBB3', 'SNCA', 'EMC10', 'RESP18', 'ATP2B2', 'NRXN1', 'SRGAP1', 'A2ML1', '2900055J20RIK', 'MYT1L', 'SPOCK2', 'ALCAM', 'FGF12', 'APBB2', 'FABP5', 'SCN1B', 'CEND1', 'RBFOX3', 'NSG2')
+    Retinal.Ganglion.Genes <- Retinal.Ganglion.Genes[Retinal.Ganglion.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Retinal.Ganglion.Genes), name = 'retinalganglion_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "retinalganglion_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "retinalganglion_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "retinalganglion_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+    #Horizontal cells:
+    Horizontal.Genes = c('CALB1', 'TPM3', 'SEPT4', 'SLC4A3', 'ADGRB1', 'ATP1B1', 'ONECUT2', 'TNR', 'VIM', 'LHX1', 'PPP1R1A', 'NDRG1', 'NEBL', 'GNG2', 'NDRG4', 'LHX1OS', 'ADRA2A', 'RGS3', 'UTRN', 'LMO1', 'PCSK6', 'SEPT8', 'F2R', 'C1QL1', 'CDC42EP4', 'SLC12A2', 'AKAP12', 'TFAP2B', 'DOCK4', 'STMN2', 'SLC4A5', 'TMEM132A', 'PDE3A', 'LRRC4', 'LSAMP', 'WFDC10', 'FAM126A', 'TMOD1', 'MEGF11', 'ARHGAP15', 'SYT2', 'UCHL1', 'RBFOX2', 'AKAIN1', 'ITGB5', 'RCAN2', 'PCBD1', 'MYO16', 'TUBB4A', 'CDH4')
+    Horizontal.Genes <- Horizontal.Genes[Horizontal.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Horizontal.Genes), name = 'horizontal_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "horizontal_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "horizontal_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "horizontal_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+    #RPE cells:
+    RPE.Genes = c('CTSS', 'C1QB', 'C1QA', 'C1QC', 'HEXB', 'TYROBP', 'CCL12', 'FCER1G', 'CX3CR1', 'B2M', 'CCL4', 'LY86', 'CCL3', 'TREM2', 'CSF1R', 'SELPLG', 'LAPTM5', 'JUNB', 'RGS10', 'CD52', 'CCL2', 'EGR1', 'JUN', 'CD9', 'AIF1', 'ZFP36', 'CYBA', 'CTSZ', 'LYZ2', 'P2RY12', 'GPR34', 'SIGLECH', 'SPARC', 'MAFB', 'TMEM119', 'SELENOP', 'RHOB', 'NPC2', 'SAT1', 'OLFML3', 'KCTD12', 'GRN', 'LY6E', 'IFI27L2A', 'CORO1A', 'SH3BGRL3', 'KLF2', 'UNC93B1', 'LYN', 'CTSH')
+    RPE.Genes <- RPE.Genes[RPE.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(RPE.Genes), name = 'RPE_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "RPE_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "RPE_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "RPE_score1", pt.size = 0) + theme(aspect.ratio = 1))
+    
+    #Endothelial cells:
+    Endothelial.Genes = c('LY6C1', 'CLDN5', 'PLTP', 'CXCL12', 'LY6A', 'IGFBP7', 'ITM2A', 'SLCO1A4', 'RGS5', 'FLT1', 'MGP', 'IFITM3', 'SPOCK2', 'CRIP1', 'RAMP2', 'EGFL7', 'CLEC2D', 'KLF2', 'PTPRB', 'SPARCL1', 'LY6E', 'ACTA2', 'ABCB1A', 'SLC7A5', 'ID3', 'TAGLN', 'SLC9A3R2', 'TM4SF1', 'MYL9', 'ID1', 'CRIP2', 'SLC2A1', 'HSPB1', 'FN1', 'SPARC', 'EPAS1', 'ADGRL4', 'ABHD2', 'CTLA2A', 'FXYD5', 'SLCO1C1', 'SELENOP', 'PDGFB', 'ADGRF5', 'AHNAK', 'ABCG2', 'RGCC', 'PGLYRP1', 'GNG11', 'GPCPD1')
+    Endothelial.Genes <- Endothelial.Genes[Endothelial.Genes %in% getGenes(stress.integrated)]
+    stress.integrated <- AddModuleScore(object = stress.integrated, features = list(Endothelial.Genes), name = 'endothelial_score', ctrl = 80)
+    print(FeaturePlot(stress.integrated, features = "endothelial_score1", label = TRUE) + theme(aspect.ratio = 1))
+    print(FeaturePlot(stress.integrated, features = "endothelial_score1", label = TRUE, split.by = "Group") + theme(aspect.ratio = 1))
+    print(VlnPlot(stress.integrated, features = "endothelial_score1", pt.size = 0) + theme(aspect.ratio = 1))
+
+All.cell.scores <- data.frame(stress.integrated$rod_score1, stress.integrated$bipolar_score1, stress.integrated$cone_score1, stress.integrated$mullerglia_score1, stress.integrated$amacrine_score1, stress.integrated$retinalganglion_score1, stress.integrated$horizontal_score1, stress.integrated$RPE_score1, stress.integrated$endothelial_score1)
+best_cell_score <- colnames(All.cell.scores)[max.col(All.cell.scores, ties.method = "first")]
+best_cell_score <- sub("stress.integrated.", "", best_cell_score)
+best_cell_score <-  sub("_score1", "", best_cell_score)
+stress.integrated$cell.ident <- best_cell_score
+
+cell_score_colors = c("rod"="#A5D0E8", "bipolar"="#7CBC38", "cone"="#F9D973", "mullerglia"="#ED723F", "amacrine"="#ED79B9", "retinalganglion"="#BD63B7", "horizontal"="#827057", "RPE"="#01066E", "endothelial"="#367C5E")
+
+print(DimPlot(stress.integrated, split.by="Group", group.by = "cell.ident", cols=cell_score_colors))
+dev.off()
+
+write.csv(table(stress.integrated$cell.ident, stress.integrated$Group), file = "stress_Int_1.csv")
+write.csv(prop.table(table(stress.integrated$cell.ident, stress.integrated$Group), margin = 2) *100, file = "stress_Int_prop1.csv")
+
+cell.percentage.data <- data.frame(prop.table(table(stress.integrated$cell.ident, stress.integrated$Group), margin = 2) *100)
+print(ggplot(aes(y=Freq, x=Var2, fill=Var1), data = cell.percentage.data) + geom_bar(stat = 'identity') + coord_flip() + scale_fill_manual('Cell types', values = cell_score_colors) + theme_classic())
+
+saveRDS(stress.integrated, file = "HumanStress_WTAnch.rds")
+
+```
+```{r}
+Idents(stress.integrated) <- "new.cell.ident"
+subset.mg <-subset(x = stress.integrated, idents = "mullerglia")
+subset.r <-subset(x = stress.integrated, idents = "rod")
+subset.c <-subset(x = stress.integrated, idents = "cone")
+subset.b <-subset(x = stress.integrated, idents = "bipolar")
+subset.a <-subset(x = stress.integrated, idents = "amacrine")
+```
+
+```{r}
+Idents(subset.stress) <- "new.cell.ident"
+subset.mg <-subset(x = subset.stress, idents = "mullerglia")
+subset.r <-subset(x = subset.stress, idents = "rod")
+subset.c <-subset(x = subset.stress, idents = "cone")
+subset.b <-subset(x = subset.stress, idents = "bipolar")
+subset.a <-subset(x = subset.stress, idents = "amacrine")
+```
+Idents(stress.integrated) <- "Group"
+subset.wt <-subset(x = stress.integrated, idents = "WT")
+subset.stress <-subset(x = stress.integrated, idents = "Stress")
+
+```{r}
+subset <- ScaleData(subset.b, verbose = FALSE)
+subset <- RunPCA(subset, npcs = 30, verbose = FALSE)
+subset <- RunUMAP(subset, reduction = "pca", dims = 1:30)
+subset <- FindNeighbors(subset, reduction = "pca", dims = 1:30)
+subset <- FindClusters(subset, resolution = 0.4)
+subset <- FindClusters(subset, resolution = 0.2)
+subset <- FindClusters(subset, resolution = 0.05)
+DimPlot(subset, group.by = "Group", cols = c("black", "grey", "black"))
+```
+
+```{r}
+stress.integrated <- RenameIdents(object = stress.integrated, `0` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `1` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `2` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `3` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `4` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `5` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `6` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `7` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `8` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `9` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `10` = "cone")
+stress.integrated <- RenameIdents(object = stress.integrated, `11` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `12` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `13` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `14` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `15` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `16` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `17` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `18` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `19` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `20` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `21` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `22` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `23` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `24` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `25` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `26` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `27` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `28` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `29` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `30` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `31` = "cone")
+stress.integrated <- RenameIdents(object = stress.integrated, `32` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `33` = "horizontal")
+stress.integrated <- RenameIdents(object = stress.integrated, `34` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `35` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `36` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `37` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `38` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `39` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `40` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `41` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `42` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `43` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `44` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `45` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `46` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `47` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `48` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `49` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `50` = "rpe")
+stress.integrated <- RenameIdents(object = stress.integrated, `51` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `52` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `53` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `54` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `55` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `56` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `57` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `58` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `59` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `60` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `61` = "rgc")
+stress.integrated <- RenameIdents(object = stress.integrated, `62` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `63` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `64` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `65` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `66` = "cone")
+stress.integrated <- RenameIdents(object = stress.integrated, `67` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `68` = "endothelial")
+stress.integrated <- RenameIdents(object = stress.integrated, `69` = "endothelial")
+stress.integrated <- RenameIdents(object = stress.integrated, `70` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `71` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `72` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `73` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `74` = "rpe")
+stress.integrated <- RenameIdents(object = stress.integrated, `75` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `76` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `77` = "horizontal")
+stress.integrated <- RenameIdents(object = stress.integrated, `78` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `79` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `80` = "rgc")
+stress.integrated <- RenameIdents(object = stress.integrated, `81` = "rod")
+stress.integrated <- RenameIdents(object = stress.integrated, `82` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `83` = "bipolar")
+stress.integrated <- RenameIdents(object = stress.integrated, `84` = "amacrine")
+stress.integrated <- RenameIdents(object = stress.integrated, `85` = "rpe")
+stress.integrated <- RenameIdents(object = stress.integrated, `86` = "mullerglia")
+stress.integrated <- RenameIdents(object = stress.integrated, `87` = "amacrine")
+```
+stress.integrated[["new.cell.ident"]] <- Idents(object = stress.integrated)
